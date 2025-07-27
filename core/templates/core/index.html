@@ -10,6 +10,69 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'index' %}">
+                <i class="fas fa-brain me-2"></i>LucidPressAI
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'index' %}">
+                            <i class="fas fa-home me-1"></i>Home
+                        </a>
+                    </li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'dashboard' %}">
+                            <i class="fas fa-chart-bar me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i>{{ user.first_name }}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'profile' %}">
+                                    <i class="fas fa-user-edit me-2"></i>Profile
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'dashboard' %}">
+                                    <i class="fas fa-chart-line me-2"></i>Dashboard
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'logout' %}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">
+                                <i class="fas fa-user-plus me-1"></i>Register
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <!-- Header -->
         <div class="app-header fade-in">
@@ -21,6 +84,14 @@
                 <i class="fas fa-robot me-2"></i>
                 Next-Generation AI News Analysis Engine
             </p>
+            {% if user.is_authenticated %}
+                <div class="user-welcome">
+                    <p class="text-muted">
+                        <i class="fas fa-user-circle me-2"></i>
+                        Welcome back, {{ user.first_name }}! You've analyzed {{ user.articles_analyzed }} articles.
+                    </p>
+                </div>
+            {% endif %}
         </div>
 
         <!-- Main Card -->
@@ -64,6 +135,55 @@
                         <i class="fas fa-brain"></i>
                         AI Analysis
                     </h3>
+                    
+                    <!-- Analysis Metadata -->
+                    <div class="analysis-metadata mb-3">
+                        <div class="row">
+                            {% if extraction_method %}
+                            <div class="col-md-3">
+                                <small>
+                                    <i class="fas fa-cog me-1"></i>Method:
+                                </small>
+                                <div class="text-muted">
+                                    <strong>{{ extraction_method|title }}</strong>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if word_count %}
+                            <div class="col-md-3">
+                                <small>
+                                    <i class="fas fa-file-text me-1"></i>Words:
+                                </small>
+                                <div class="text-muted">
+                                    <strong>{{ word_count }}</strong>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if sentiment.sentiment %}
+                            <div class="col-md-3">
+                                <small>
+                                    <i class="fas fa-heart me-1"></i>Sentiment:
+                                </small>
+                                <div>
+                                    <span class="badge bg-{% if sentiment.sentiment == 'positive' %}success{% elif sentiment.sentiment == 'negative' %}danger{% else %}secondary{% endif %}">
+                                        {{ sentiment.sentiment|title }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if sentiment.confidence %}
+                            <div class="col-md-3">
+                                <small>
+                                    <i class="fas fa-chart-bar me-1"></i>Confidence:
+                                </small>
+                                <div class="text-muted">
+                                    <strong>{{ sentiment.confidence|title }}</strong>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
                     <textarea class="summary-textarea w-100" rows="6" readonly>{{ summary }}</textarea>
                 </div>
             {% endif %}

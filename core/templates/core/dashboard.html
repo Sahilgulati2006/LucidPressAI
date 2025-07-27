@@ -1,0 +1,137 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard - LucidPressAI{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Welcome Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-gradient-primary text-white">
+                <div class="card-body">
+                    <h2 class="card-title">Welcome back, {{ user.first_name }}!</h2>
+                    <p class="card-text">Here's your activity overview and analytics.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ articles_analyzed }}</h3>
+                    <p class="card-text">Articles Analyzed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">{{ total_activities }}</h3>
+                    <p class="card-text">Total Activities</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info">{{ user.date_joined|date:"M" }}</h3>
+                    <p class="card-text">Member Since</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">{{ last_analysis|date:"M d"|default:"N/A" }}</h3>
+                    <p class="card-text">Last Analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activities and Quick Actions -->
+    <div class="row">
+        <!-- Recent Activities -->
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Recent Activities</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_activities %}
+                        <div class="list-group list-group-flush">
+                            {% for activity in recent_activities %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-{% if activity.activity_type == 'login' %}success{% elif activity.activity_type == 'article_analysis' %}primary{% elif activity.activity_type == 'registration' %}info{% else %}secondary{% endif %} me-2">
+                                        {{ activity.activity_type|title }}
+                                    </span>
+                                    {% if activity.activity_type == 'article_analysis' %}
+                                        Analyzed article ({{ activity.details.summary_length }} characters)
+                                    {% elif activity.activity_type == 'login' %}
+                                        Logged in via web
+                                    {% elif activity.activity_type == 'registration' %}
+                                        Account created
+                                    {% else %}
+                                        {{ activity.details }}
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ activity.timestamp|date:"M d, H:i" }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">No recent activities.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'index' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Analyze New Article
+                        </a>
+                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user"></i> Edit Profile
+                        </a>
+                        <a href="{% url 'logout' %}" class="btn btn-outline-danger">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Info -->
+            <div class="card shadow mt-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Account Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ user.get_full_name }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Member since:</strong> {{ user.date_joined|date:"M d, Y" }}</p>
+                    {% if user.last_analysis_date %}
+                        <p><strong>Last analysis:</strong> {{ user.last_analysis_date|date:"M d, Y H:i" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+</style>
+{% endblock %} 

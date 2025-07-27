@@ -16,3 +16,13 @@ spacy==3.7.4
 tqdm==4.66.4
 lxml==5.2.1
 certifi==2024.2.2
+
+# Additional dependencies for user authentication and ML
+tensorflow==2.19.0
+tf-keras==2.19.0
+sentencepiece==0.2.0
+lxml-html-clean==0.4.2
+djangorestframework==3.16.0
+
+# Enhanced article extraction and sentiment analysis
+soupsieve>=2.7
