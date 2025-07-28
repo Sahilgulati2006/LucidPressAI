@@ -34,17 +34,15 @@ config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebK
 config.request_timeout = 10
 
 def fetch_article_text(url):
-    """Enhanced article text extraction with multiple fallback methods"""
+    """Enhanced article text extraction with multiple fallback methods, including liveblog support."""
     try:
         # Method 1: Try newspaper3k with better configuration
         article = Article(url, config=config)
         article.download()
         article.parse()
-        
         # If newspaper3k got good content, use it
         if article.text and len(article.text.strip()) > 200:
             return article.text
-        
         # Method 2: Fallback to direct requests + BeautifulSoup
         print("Newspaper3k extraction was poor, trying direct extraction...")
         headers = {
@@ -52,38 +50,40 @@ def fetch_article_text(url):
         }
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        
         soup = BeautifulSoup(response.content, 'html.parser')
-        
+        # Special handling for TOI liveblogs
+        if 'timesofindia.indiatimes.com' in url and 'liveblog' in url:
+            print("Detected TOI liveblog, extracting all liveblog entries...")
+            entries = soup.find_all(class_=re.compile(r'liveblog-entry|_3YYSt'))
+            if not entries:
+                # Try to find all <li> blocks with updates
+                entries = soup.find_all('li')
+            text = '\n'.join([e.get_text(separator=' ', strip=True) for e in entries if e.get_text(strip=True)])
+            if len(text.strip()) > 200:
+                return text
         # Remove script and style elements
         for script in soup(["script", "style"]):
             script.decompose()
-        
         # Try to find main content areas
         content_selectors = [
             'article', 'main', '.content', '.post-content', '.article-content',
             '.entry-content', '.story-content', '.news-content', '[role="main"]'
         ]
-        
         content = None
         for selector in content_selectors:
             content = soup.select_one(selector)
             if content and len(content.get_text().strip()) > 200:
                 break
-        
         if not content:
             # Fallback to body text
             content = soup.find('body')
-        
         if content:
             text = content.get_text()
             # Clean up the text
             text = re.sub(r'\s+', ' ', text)
             text = re.sub(r'\n+', '\n', text)
             return text.strip()
-        
         return None
-        
     except Exception as e:
         print(f"Error fetching article text: {e}")
         return None
@@ -140,14 +140,60 @@ def analyze_sentiment(text):
         print(f"Error in sentiment analysis: {e}")
         return {"sentiment": "neutral", "score": 0.0, "confidence": "error"}
 
+def chunk_text(text, max_tokens=512):
+    """Split text into chunks of approximately max_tokens words."""
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), max_tokens):
+        chunk = ' '.join(words[i:i+max_tokens])
+        chunks.append(chunk)
+    return chunks
+
+def remove_repetitions(text):
+    """Remove repeated sentences from a summary."""
+    seen = set()
+    result = []
+    # Split on period, question, or exclamation
+    for sentence in re.split(r'(?<=[.!?]) +', text):
+        s = sentence.strip()
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            result.append(s)
+    return ' '.join(result)
+
+def extract_unique_updates(text):
+    """Split by newlines, remove empty and duplicate lines, and skip very short lines."""
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    seen = set()
+    unique_lines = []
+    for line in lines:
+        l = line.lower()
+        if l not in seen and len(l) > 20:
+            seen.add(l)
+            unique_lines.append(line)
+    return '\n'.join(unique_lines)
+
+def chunk_sentences(text, max_sentences=8):
+    sentences = sent_tokenize(text)
+    chunks = []
+    for i in range(0, len(sentences), max_sentences):
+        chunk = ' '.join(sentences[i:i+max_sentences])
+        chunks.append(chunk)
+    return chunks
+
+def trim_to_last_complete_sentence(text):
+    """Trim text to the last complete sentence (ending with . ! or ?)."""
+    match = re.search(r'([.!?])[^.!?]*$', text)
+    if match:
+        end = match.end(1)
+        return text[:end].strip()
+    return text.strip()
+
 def get_summary_and_bias(url):
-    """Enhanced summary generation with fallback methods and sentiment analysis"""
+    """Super-detailed summary: deduplicate, chunk by sentences, summarize each, then combine and summarize again."""
     try:
         print(f"Processing article from: {url}")
-        
-        # Fetch article text
         text = fetch_article_text(url)
-        
         if not text or len(text.strip()) < 100:
             return {
                 "summary": "Unable to extract sufficient content from this URL. Please check if the URL is accessible and contains readable text.",
@@ -155,51 +201,60 @@ def get_summary_and_bias(url):
                 "word_count": 0,
                 "extraction_method": "failed"
             }
-        
         print(f"Extracted text length: {len(text)} characters")
-        
-        # Analyze sentiment
         sentiment_result = analyze_sentiment(text)
-        
-        # Try T5 summarization first
+        # --- Deduplicate and clean updates ---
+        text = extract_unique_updates(text)
+        # --- Sentence-aware chunking ---
         try:
-            # Truncate text if too long for T5
-            max_input_length = 1024
-            if len(text) > max_input_length:
-                text = text[:max_input_length]
-            
-            input_text = f"summarize: {text}"
+            chunks = chunk_sentences(text, max_sentences=8)
+            chunk_summaries = []
+            for idx, chunk in enumerate(chunks):
+                input_text = f"summarize: {chunk}"
+                input_ids = tokenizer.encode(input_text, return_tensors='tf')
+                summary_ids = model.generate(
+                    input_ids,
+                    max_length=512,   # longer chunk summaries
+                    min_length=100,
+                    length_penalty=1.0,
+                    num_beams=4,
+                    early_stopping=True,
+                    do_sample=True,
+                    temperature=0.7
+                )
+                chunk_summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+                chunk_summaries.append(chunk_summary)
+            # 2. Concatenate chunk summaries
+            combined_summary = ' '.join(chunk_summaries)
+            # 3. Optionally, summarize the combined summary for coherence
+            input_text = f"summarize: {combined_summary}"
             input_ids = tokenizer.encode(input_text, return_tensors='tf')
-            
             summary_ids = model.generate(
                 input_ids,
-                max_length=200,
-                min_length=50,
-                length_penalty=2.0,
+                max_length=512,   # final summary can be very long
+                min_length=180,
+                length_penalty=1.0,
                 num_beams=4,
                 early_stopping=True,
                 do_sample=True,
                 temperature=0.7
             )
-            
-            summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-            
-            # Check if summary is meaningful
-            if summary and len(summary.strip()) > 30 and not summary.startswith("summarize:"):
+            final_summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            # Remove repeated sentences
+            final_summary = remove_repetitions(final_summary)
+            final_summary = trim_to_last_complete_sentence(final_summary)
+            if final_summary and len(final_summary.strip()) > 30 and not final_summary.startswith("summarize:"):
                 return {
-                    "summary": summary,
+                    "summary": final_summary,
                     "sentiment": sentiment_result,
                     "word_count": len(text.split()),
-                    "extraction_method": "T5_summarization"
+                    "extraction_method": "T5_super_detailed"
                 }
-        
         except Exception as e:
-            print(f"T5 summarization failed: {e}")
-        
+            print(f"Super-detailed summarization failed: {e}")
         # Fallback: Extract key sentences
         print("Using fallback summarization method...")
-        fallback_summary = extract_key_sentences(text, num_sentences=4)
-        
+        fallback_summary = extract_key_sentences(text, num_sentences=6)
         if fallback_summary and len(fallback_summary.strip()) > 50:
             return {
                 "summary": fallback_summary,
@@ -207,25 +262,21 @@ def get_summary_and_bias(url):
                 "word_count": len(text.split()),
                 "extraction_method": "key_sentences"
             }
-        
-        # Last resort: return first few sentences
         sentences = sent_tokenize(text)
         if sentences:
-            first_sentences = " ".join(sentences[:3])
+            first_sentences = " ".join(sentences[:5])
             return {
                 "summary": first_sentences,
                 "sentiment": sentiment_result,
                 "word_count": len(text.split()),
                 "extraction_method": "first_sentences"
             }
-        
         return {
             "summary": "Unable to generate a meaningful summary from this content.",
             "sentiment": sentiment_result,
             "word_count": len(text.split()),
             "extraction_method": "failed"
         }
-        
     except Exception as e:
         print(f"Error processing article: {e}")
         return {

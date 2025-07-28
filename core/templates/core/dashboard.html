@@ -71,6 +71,12 @@
                                     </span>
                                     {% if activity.activity_type == 'article_analysis' %}
                                         Analyzed article ({{ activity.details.summary_length }} characters)
+                                        {% if activity.details.url %}
+                                            &nbsp;|&nbsp;
+                                            <a href="{{ activity.details.url }}" target="_blank" class="text-decoration-underline text-primary" style="word-break: break-all;">
+                                                View Article
+                                            </a>
+                                        {% endif %}
                                     {% elif activity.activity_type == 'login' %}
                                         Logged in via web
                                     {% elif activity.activity_type == 'registration' %}

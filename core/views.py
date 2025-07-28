@@ -53,12 +53,12 @@ def index(request):
                     classification = [("Error: Could not extract article text", 0.0)]
                     messages.warning(request, "Article text extraction failed")
                 
-                # Track user activity with enhanced details
+                # Track user activity with enhanced details (ensure url is always present)
                 UserActivity.objects.create(
                     user=request.user,
                     activity_type='article_analysis',
                     details={
-                        'url': article_url,
+                        'url': article_url,  # Always store the URL
                         'summary_length': len(summary) if summary else 0,
                         'classification_count': len(classification) if classification else 0,
                         'word_count': word_count,
