@@ -73,6 +73,35 @@
         </div>
     </nav>
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner">
+                <i class="fas fa-brain fa-spin"></i>
+            </div>
+            <h3 class="loading-title">Processing Article</h3>
+            <p class="loading-subtitle">AI is analyzing your content...</p>
+            <div class="loading-steps">
+                <div class="loading-step">
+                    <i class="fas fa-download"></i>
+                    <span>Extracting content</span>
+                </div>
+                <div class="loading-step">
+                    <i class="fas fa-brain"></i>
+                    <span>Generating summary</span>
+                </div>
+                <div class="loading-step">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analyzing sentiment</span>
+                </div>
+                <div class="loading-step">
+                    <i class="fas fa-tags"></i>
+                    <span>Classifying topics</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <div class="app-header fade-in">
@@ -97,7 +126,7 @@
         <!-- Main Card -->
         <div class="main-card fade-in">
             <!-- URL Input Form -->
-            <form method="POST" class="mb-4">
+            <form method="POST" class="mb-4" id="analysis-form">
                 {% csrf_token %}
                 <div class="form-group">
                     <label for="article_url" class="form-label">
@@ -111,7 +140,7 @@
                            value="{{ last_url }}"
                            required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">
+                <button type="submit" class="btn btn-primary w-100" id="submit-btn">
                     <i class="fas fa-rocket me-2"></i>Launch Analysis
                 </button>
             </form>
@@ -245,6 +274,33 @@
                     title.style.transition = 'opacity 1s ease-in';
                     title.style.opacity = '1';
                 }, 500);
+            }
+
+            // Loading overlay functionality
+            const form = document.getElementById('analysis-form');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (form && loadingOverlay) {
+                form.addEventListener('submit', function(e) {
+                    // Show loading overlay
+                    loadingOverlay.style.display = 'flex';
+                    loadingOverlay.style.opacity = '0';
+                    
+                    // Fade in the overlay
+                    setTimeout(() => {
+                        loadingOverlay.style.opacity = '1';
+                    }, 10);
+
+                    // Disable submit button to prevent double submission
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                });
+            }
+
+            // Hide loading overlay if page loads with results (back button scenario)
+            if (window.location.search.includes('article_url') || document.querySelector('.summary-section')) {
+                loadingOverlay.style.display = 'none';
             }
         });
     </script>
